@@ -4,7 +4,7 @@
     "dev": "next dev",
     "build": "next build",
     "test": "node --test --experimental-strip-types tests/*.test.ts",
-    "worker": "node --experimental-strip-types worker/registro-tda.ts"
+    "worker": "node --env-file=.env --experimental-strip-types worker/registro-tda.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.58.0",

@@ -1,12 +1,17 @@
+process.loadEnvFile();
+
 import { Worker, type Job } from "bullmq";
 import { chromium, type Browser } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import { buildTdaUser, type TdaJobData } from "../lib/tda-worker.ts";
+import fs from "node:fs";
 
 const queueName = "registro-tda";
 const connection = { host: "localhost", port: 6380 };
 const enrollUrl =
   process.env.TDA_ENROLL_URL ?? "https://catalog.techdiplomacyacademy.org/es/intro-tech-diplomacy";
+
+console.log("URL de inscripción configurada:", enrollUrl);
 
 async function markCompleted(email: string) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -30,10 +35,11 @@ async function markCompleted(email: string) {
 async function processRegistration(job: Job<TdaJobData>) {
   const user = buildTdaUser(job.data);
   let browser: Browser | undefined;
+  let page;
 
   try {
     browser = await chromium.launch({ headless: false, slowMo: 50 });
-    const page = await browser.newPage();
+    page = await browser.newPage();
 
     await page.goto(enrollUrl, { waitUntil: "domcontentloaded" });
     await page.click('text="Inscríbase gratis"');
@@ -45,16 +51,67 @@ async function processRegistration(job: Job<TdaJobData>) {
     await page.fill('input[name="first_name"]', user.nombre);
     await page.fill('input[name="last_name"]', user.apellidos);
     await page.check('input[name="legal_mMeL"]');
-    await page.click('button:has-text("Continue")');
-    await page.selectOption('select[name="dropdown_job_function"]', { label: user.tdaRole });
-    await page.selectOption('select[name="dropdown_industry"]', { label: "Student/Academic" });
-    await page.selectOption('select[name="dropdown_sub_role"]', { label: user.tdaRole });
-    await page.click('button:has-text("Continue")');
-    await page.waitForSelector('text="Dashboard for:"');
+    await page.click('button:has-text("Continue"):visible');
+    // Mapear los valores de los dropdowns para TDA de forma robusta
+    const jobFunctionValue = "Student/Academic";
+    const industryValue = "Policy";
+    const subRoleValue = user.rol === "Teacher" ? "teacher" : "student";
 
+    console.log(`Seleccionando opciones en TDA: job_function=${jobFunctionValue}, industry=${industryValue}, sub_role=${subRoleValue}`);
+
+    await page.locator('select[name="dropdown_job_function"]').evaluate((el: HTMLSelectElement, val) => {
+      el.value = val;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, jobFunctionValue);
+
+    await page.locator('select[name="dropdown_industry"]').evaluate((el: HTMLSelectElement, val) => {
+      el.value = val;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, industryValue);
+
+    await page.locator('select[name="dropdown_sub_role"]').evaluate((el: HTMLSelectElement, val) => {
+      el.value = val;
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    }, subRoleValue);
+
+    // Darle un pequeño respiro para que el estado de React se actualice
+    await page.waitForTimeout(500);
+
+    await page.click('button:has-text("Continue"):visible');
+
+    // Esperar a que la página cargue tras el login/registro.
+    // Podría redirigir directamente al Dashboard o a la página del curso/programa con el botón "Enroll" / "Inscribirse".
+    try {
+      const result = await Promise.race([
+        page.waitForSelector('text="Dashboard for:"', { timeout: 15000 }).then(() => "dashboard"),
+        page.waitForSelector('button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")', { timeout: 15000 }).then(() => "enroll_button")
+      ]);
+
+      if (result === "enroll_button") {
+        console.log("Detectado botón de inscripción (Enroll/Inscribirse), haciendo click...");
+        const enrollBtn = page.locator('button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")').first();
+        await enrollBtn.click();
+        console.log("Click realizado. Esperando redirección al Dashboard...");
+        await page.waitForSelector('text="Dashboard for:"');
+      }
+    } catch (e) {
+      console.log("No se pudo detectar el dashboard o el botón de inscripción en el primer intento. Esperando por Dashboard...", e);
+      await page.waitForSelector('text="Dashboard for:"');
+    }
+
+    console.log("Inscripción completada con éxito. URL del Dashboard:", page.url());
     await markCompleted(user.email);
   } catch (error) {
     console.error(`Fallo registro-tda job ${job.id}:`, error);
+    if (page) {
+      try {
+        await page.screenshot({ path: 'worker-error.png', fullPage: true });
+        const html = await page.content();
+        fs.writeFileSync('worker-error.html', html);
+      } catch (err) {
+        console.error("Error al guardar capturas/html en el bloque catch:", err);
+      }
+    }
     throw error;
   } finally {
     await browser?.close();
