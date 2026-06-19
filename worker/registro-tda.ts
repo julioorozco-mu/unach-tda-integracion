@@ -38,7 +38,7 @@ async function processRegistration(job: Job<TdaJobData>) {
   let page;
 
   try {
-    browser = await chromium.launch({ headless: false, slowMo: 50 });
+    browser = await chromium.launch({ headless: true, slowMo: 50 });
     page = await browser.newPage();
 
     await page.goto(enrollUrl, { waitUntil: "domcontentloaded" });
@@ -83,20 +83,21 @@ async function processRegistration(job: Job<TdaJobData>) {
     // Podría redirigir directamente al Dashboard o a la página del curso/programa con el botón "Enroll" / "Inscribirse".
     try {
       const result = await Promise.race([
-        page.waitForSelector('text="Dashboard for:"', { timeout: 15000 }).then(() => "dashboard"),
-        page.waitForSelector('button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")', { timeout: 15000 }).then(() => "enroll_button")
+        page.waitForURL('**/dashboard**', { timeout: 15000 }).then(() => "dashboard"),
+        page.waitForSelector('.enrollment-button, button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")', { timeout: 15000 }).then(() => "enroll_button")
       ]);
 
       if (result === "enroll_button") {
-        console.log("Detectado botón de inscripción (Enroll/Inscribirse), haciendo click...");
-        const enrollBtn = page.locator('button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")').first();
+        console.log("Detectado botón de inscripción, haciendo click...");
+        await page.waitForTimeout(2000); // Dar tiempo a que el Javascript de HubSpot asigne el evento de click al enlace href=""
+        const enrollBtn = page.locator('.enrollment-button, button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")').first();
         await enrollBtn.click();
         console.log("Click realizado. Esperando redirección al Dashboard...");
-        await page.waitForSelector('text="Dashboard for:"');
+        await page.waitForURL('**/dashboard**', { timeout: 15000 });
       }
     } catch (e) {
       console.log("No se pudo detectar el dashboard o el botón de inscripción en el primer intento. Esperando por Dashboard...", e);
-      await page.waitForSelector('text="Dashboard for:"');
+      await page.waitForURL('**/dashboard**', { timeout: 15000 });
     }
 
     console.log("Inscripción completada con éxito. URL del Dashboard:", page.url());
