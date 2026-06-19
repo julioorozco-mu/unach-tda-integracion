@@ -75,6 +75,7 @@ npm run build
 ## 📂 Estructura Principal
 
 - `/app`: Contiene las rutas y páginas de la interfaz web en Next.js.
+- `/components`: Componentes reutilizables de la interfaz de usuario (ej. overlays, animaciones).
 - `/worker`: Contiene la lógica del worker (`registro-tda.ts`) encargado de automatizar el registro mediante Playwright.
 - `/supabase`: Contiene configuraciones y migraciones relacionadas con la base de datos.
 - `/tests`: Contiene los archivos de prueba para validar el comportamiento del código.

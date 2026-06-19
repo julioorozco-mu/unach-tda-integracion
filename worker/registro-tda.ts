@@ -83,7 +83,7 @@ async function processRegistration(job: Job<TdaJobData>) {
     // Podría redirigir directamente al Dashboard o a la página del curso/programa con el botón "Enroll" / "Inscribirse".
     try {
       const result = await Promise.race([
-        page.waitForURL('**/dashboard**', { timeout: 15000 }).then(() => "dashboard"),
+        page.waitForURL(/dashboard|tech-primer-series|catalog\.techdiplomacyacademy\.org/, { timeout: 15000 }).then(() => "success_url"),
         page.waitForSelector('.enrollment-button, button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")', { timeout: 15000 }).then(() => "enroll_button")
       ]);
 
@@ -92,15 +92,15 @@ async function processRegistration(job: Job<TdaJobData>) {
         await page.waitForTimeout(2000); // Dar tiempo a que el Javascript de HubSpot asigne el evento de click al enlace href=""
         const enrollBtn = page.locator('.enrollment-button, button:has-text("Enroll"), a:has-text("Enroll"), button:has-text("Inscribirse"), a:has-text("Inscribirse"), button:has-text("Inscríbase"), a:has-text("Inscríbase")').first();
         await enrollBtn.click();
-        console.log("Click realizado. Esperando redirección al Dashboard...");
-        await page.waitForURL('**/dashboard**', { timeout: 15000 });
+        console.log("Click realizado. Esperando redirección...");
+        await page.waitForURL(/dashboard|tech-primer-series|catalog\.techdiplomacyacademy\.org/, { timeout: 15000 });
       }
     } catch (e) {
-      console.log("No se pudo detectar el dashboard o el botón de inscripción en el primer intento. Esperando por Dashboard...", e);
-      await page.waitForURL('**/dashboard**', { timeout: 15000 });
+      console.log("No se pudo detectar el dashboard o el botón de inscripción en el primer intento. Esperando por redirección final...", e);
+      await page.waitForURL(/dashboard|tech-primer-series|catalog\.techdiplomacyacademy\.org/, { timeout: 15000 });
     }
 
-    console.log("Inscripción completada con éxito. URL del Dashboard:", page.url());
+    console.log("Inscripción completada con éxito. URL final:", page.url());
     await markCompleted(user.email);
   } catch (error) {
     console.error(`Fallo registro-tda job ${job.id}:`, error);

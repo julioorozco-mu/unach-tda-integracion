@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { roles, type RegistrationInput } from "../lib/registration";
+import { RedirectCountdownOverlay } from "../components/RedirectCountdownOverlay";
 
 const emptyForm: RegistrationInput = {
   matricula: "",
@@ -22,6 +23,17 @@ export default function Home() {
     setStatus("loading");
     setMessage("");
 
+    const prefix = form.correo.split("@")[0].trim().toLowerCase();
+    const generatedClave = `${prefix}Unach2026!`;
+
+    // Intentamos copiar la contraseña inmediatamente al hacer click en "Registrar"
+    // ya que el navegador requiere un evento de usuario directo para usar el portapapeles.
+    try {
+      await navigator.clipboard.writeText(generatedClave);
+    } catch (err) {
+      console.error("No se pudo copiar preventivamente:", err);
+    }
+
     const response = await fetch("/api/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -36,9 +48,6 @@ export default function Home() {
       return;
     }
 
-    const prefix = form.correo.split("@")[0].trim().toLowerCase();
-    const generatedClave = `${prefix}Unach2026!`;
-
     setCredentials({
       correo: form.correo.trim().toLowerCase(),
       clave: generatedClave,
@@ -48,6 +57,8 @@ export default function Home() {
     setMessage("");
   }
 
+  const targetUrl = "https://courses.techdiplomacyacademy.org/dashboard";
+
   async function handleLoginRedirect() {
     if (!credentials) return;
     try {
@@ -55,7 +66,7 @@ export default function Home() {
     } catch (err) {
       console.error("No se pudo copiar la contraseña automáticamente:", err);
     } finally {
-      window.location.href = "https://courses.techdiplomacyacademy.org/dashboard";
+      window.location.href = targetUrl;
     }
   }
 
@@ -176,6 +187,14 @@ export default function Home() {
           )}
         </section>
       </section>
+
+      <RedirectCountdownOverlay 
+        open={status === "ok"} 
+        seconds={15}
+        targetUrl={targetUrl}
+        onComplete={handleLoginRedirect}
+        onSkip={handleLoginRedirect}
+      />
     </main>
   );
 }
