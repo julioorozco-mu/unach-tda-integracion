@@ -16,23 +16,50 @@ Asegúrate de contar con lo siguiente antes de ejecutar el proyecto:
 
 ---
 
-## ⚙️ Configuración Inicial
+## ⚙️ Instalación y Configuración Local (Guía desde cero)
 
-1. **Instalar dependencias**:
-   Instala todas las librerías necesarias con el siguiente comando:
-   ```bash
-   npm install
-   ```
+Si acabas de clonar este repositorio en una nueva computadora, sigue estos pasos rigurosamente para asegurar que tanto la web como el worker funcionen:
 
-2. **Variables de entorno**:
-   Debes crear un archivo llamado `.env` en la raíz del proyecto. Este archivo debe contener la configuración de Supabase y las URLs de la TDA. 
+### 1. Clonar e Instalar Dependencias
+Primero clona el proyecto e instala los paquetes base de Node.js:
+```bash
+git clone https://github.com/julioorozco-mu/unach-tda-integracion.git
+cd unach-tda-integracion
+npm install
+```
 
-   Ejemplo de contenido para el archivo `.env`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL="tu_url_de_supabase"
-   SUPABASE_SERVICE_ROLE_KEY="tu_key_de_servicio"
-   TDA_ENROLL_URL="https://catalog.techdiplomacyacademy.org/es/..."
-   ```
+### 2. Instalar Navegadores de Playwright (Para el Worker)
+El worker utiliza un navegador *headless* de Chromium para automatizar y simular el registro en la TDA. Si omites este paso, el worker fallará al arrancar.
+```bash
+npx playwright install chromium
+```
+
+### 3. Iniciar un Servidor Redis Local
+BullMQ requiere una instancia de Redis corriendo. Por defecto, el worker busca Redis en el puerto **6380**.
+La forma más rápida y limpia de levantarlo es usando Docker:
+```bash
+docker run -d -p 6380:6379 --name redis-unach redis
+```
+*(Si usas Redis de forma nativa o en la nube, deberás adaptar la configuración de conexión en `worker/registro-tda.ts`).*
+
+### 4. Variables de Entorno (.env)
+Crea un archivo llamado `.env` en la raíz del proyecto. El sistema requiere obligatoriamente acceso a Supabase y la URL de inscripción de la TDA.
+
+```env
+# Credenciales de Supabase (Base de datos principal)
+NEXT_PUBLIC_SUPABASE_URL="https://[TU-ID].supabase.co"
+SUPABASE_SERVICE_ROLE_KEY="tu-service-role-key-secreta"
+
+# URL de Inscripción destino de TDA (Suele ser de HubSpot)
+TDA_ENROLL_URL="https://catalog.techdiplomacyacademy.org/es/enroll-in-the-tech-diplomacy-academy-unach?hs_preview=TU_ID"
+```
+
+### 5. Iniciar la Base de Datos Local (Supabase CLI) - Opcional
+Si vas a desarrollar de forma totalmente local (sin usar un proyecto en supabase.com), utiliza su CLI:
+```bash
+npx supabase start
+```
+*(Luego, sustituye los valores en tu `.env` con las URL's locales que la CLI imprime en tu terminal al terminar).*
 
 ---
 
